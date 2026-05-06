@@ -1,0 +1,678 @@
+import argparse, os, re, subprocess, sys, math, tempfile
+from dataclasses import dataclass
+from typing import List, Tuple, Optional, Dict, Any
+
+try:
+    # Build a list of directories that contain onnxruntime's native DLLs.
+    # In a PyInstaller bundle they land in _MEIPASS/onnxruntime/capi/;
+    # from source they're in site-packages/onnxruntime/capi/.
+    _ort_dll_roots: list = []
+    if hasattr(sys, '_MEIPASS'):
+        _ort_dll_roots += [
+            sys._MEIPASS,
+            os.path.join(sys._MEIPASS, 'onnxruntime'),
+            os.path.join(sys._MEIPASS, 'onnxruntime', 'capi'),
+        ]
+    try:
+        import importlib.util as _ilu
+        _ort_spec = _ilu.find_spec('onnxruntime')
+        if _ort_spec and _ort_spec.submodule_search_locations:
+            for _loc in _ort_spec.submodule_search_locations:
+                _ort_dll_roots.append(os.path.join(_loc, 'capi'))
+    except Exception:
+        pass
+
+    for _dll_root in _ort_dll_roots:
+        if not os.path.isdir(_dll_root):
+            continue
+        # Register with the Windows DLL loader (Python 3.8+)
+        if hasattr(os, 'add_dll_directory'):
+            try:
+                os.add_dll_directory(_dll_root)
+            except Exception:
+                pass
+        # Also prepend to PATH for any LoadLibrary calls inside onnxruntime
+        os.environ['PATH'] = _dll_root + os.pathsep + os.environ.get('PATH', '')
+        # Pre-load every .dll in the directory via ctypes so that Windows has
+        # them cached before the .pyd import triggers the loader.
+        try:
+            import ctypes
+            for _f in os.listdir(_dll_root):
+                if _f.lower().endswith('.dll'):
+                    try:
+                        ctypes.CDLL(os.path.join(_dll_root, _f))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    import onnxruntime as _ort
+    import numpy as _np
+    VAD_AVAILABLE = True
+    _VAD_ERR = None
+except Exception as _e:
+    _ort = None
+    _np = None
+    VAD_AVAILABLE = False
+    _VAD_ERR = f"{type(_e).__name__}: {_e}"
+
+
+@dataclass
+class SilenceInterval:
+    start: float
+    end: float
+
+
+def run(cmd: List[str], timeout_sec: int = 1800) -> subprocess.CompletedProcess:
+    kwargs = dict(
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        stdin=subprocess.DEVNULL,  # critical: ffmpeg can’t wait for input
+        timeout=timeout_sec,  # critical: don’t hang forever
+    )
+
+    if os.name == "nt":
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        kwargs["startupinfo"] = si
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    return subprocess.run(cmd, **kwargs)
+
+
+def require_tool(name: str) -> None:
+    p = run([name, "-version"])
+    if p.returncode != 0:
+        raise FileNotFoundError(f'Could not run "{name}". Make sure it is installed and on PATH.')
+
+
+def get_duration_seconds(path: str) -> float:
+    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1",
+           path]
+    p = run(cmd)
+    if p.returncode != 0 or not p.stdout.strip():
+        raise RuntimeError(f"ffprobe failed to read duration for: {path}\n{p.stderr}")
+    return float(p.stdout.strip())
+
+
+def ffprobe_fields(path: str, select: str, entries: str) -> dict:
+    cmd = ["ffprobe", "-v", "error", "-select_streams", select, "-show_entries", entries, "-of",
+           "default=noprint_wrappers=1", path]
+    p = run(cmd)
+    if p.returncode != 0:
+        return {}
+    out = {}
+    for line in p.stdout.splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def get_media_info(path: str) -> dict:
+    v = ffprobe_fields(path, "v:0", "stream=width,height,avg_frame_rate,r_frame_rate,sample_aspect_ratio,field_order")
+    a = ffprobe_fields(path, "a:0", "stream=sample_rate,channels,channel_layout")
+    info = {}
+    info.update(v)
+    info.update(a)
+    return info
+
+
+def parse_rate(rate_str: str) -> float:
+    if not rate_str or "/" not in rate_str:
+        return 30.0
+    n, d = rate_str.split("/", 1)
+    n = float(n)
+    d = float(d) if float(d) != 0 else 1.0
+    return n / d
+
+
+def fps_to_timebase_ntsc_and_real_fps(fps: float) -> Tuple[int, bool, float]:
+    if abs(fps - (30000 / 1001)) < 0.05 or abs(fps - 29.97) < 0.05:
+        return 30, True, (30 / 1.001)
+    if abs(fps - (60000 / 1001)) < 0.05 or abs(fps - 59.94) < 0.05:
+        return 60, True, (60 / 1.001)
+    tb = max(1, int(round(fps)))
+    return tb, False, float(tb)
+
+
+def sec_to_frames(sec: float, fps_real: float) -> int:
+    return int(round(sec * fps_real))
+
+
+def create_mono_proxy(input_path: str, mono_path: str, sample_rate: int = 48000) -> None:
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-nostdin",
+        "-y",
+        "-i", input_path,
+        "-c:v", "copy",
+        "-c:a", "pcm_s16le",
+        "-ac", "1",
+        "-ar", str(sample_rate),
+        mono_path,
+    ]
+
+    p = run(cmd)
+
+    if (
+            p.returncode != 0
+            or not os.path.isfile(mono_path)
+            or os.path.getsize(mono_path) == 0
+    ):
+        raise RuntimeError(
+            "Failed to create mono proxy.\n"
+            f"Command: {' '.join(cmd)}\n\n"
+            f"{p.stderr}"
+        )
+
+
+def run_ffmpeg_silencedetect(path: str, threshold_db: float, min_silence: float, audio_stream: Optional[str]) -> str:
+    cmd = ["ffmpeg", "-hide_banner", "-i", path]
+    if audio_stream:
+        cmd += ["-map", audio_stream]
+    cmd += ["-vn", "-ac", "1", "-af", f"silencedetect=noise={threshold_db}dB:d={min_silence}", "-f", "null", "-"]
+    p = run(cmd)
+    if not p.stderr.strip():
+        raise RuntimeError("ffmpeg produced no silencedetect output; check ffmpeg install and input file.")
+    return p.stderr
+
+
+def _silero_model_path() -> str:
+    candidates = []
+    if hasattr(sys, '_MEIPASS'):
+        candidates.append(os.path.join(sys._MEIPASS, 'silero_vad.onnx'))
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        candidates.append(os.path.join(here, 'silero_vad.onnx'))
+    except Exception:
+        pass
+    for p in candidates:
+        if os.path.isfile(p):
+            return p
+    raise RuntimeError(
+        "silero_vad.onnx not found. Re-run build.bat to download it, "
+        "or place the file next to cut_silence_to_fcpxml.py."
+    )
+
+
+def run_vad_silencedetect(path: str, audio_stream: Optional[str],
+                           aggressiveness: int = 2) -> List[SilenceInterval]:
+    if _ort is None:
+        raise RuntimeError(f"onnxruntime could not be loaded: {_VAD_ERR}")
+
+    session = _ort.InferenceSession(_silero_model_path(),
+                                    providers=['CPUExecutionProvider'])
+
+    sample_rate = 16000
+    chunk_samples = 512          # 32 ms at 16 kHz — required chunk size for silero
+    chunk_bytes = chunk_samples * 2  # s16le
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".pcm", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+
+    try:
+        cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-i", path]
+        if audio_stream:
+            cmd += ["-map", audio_stream]
+        cmd += ["-vn", "-ac", "1", "-ar", str(sample_rate), "-f", "s16le", tmp_path]
+        p = run(cmd)
+        if p.returncode != 0:
+            raise RuntimeError(f"ffmpeg failed to extract audio for VAD.\n{p.stderr}")
+
+        with open(tmp_path, "rb") as f:
+            raw = f.read()
+
+        n_chunks = len(raw) // chunk_bytes
+
+        # Silero VAD v4: separate h (2,1,64) and c (2,1,64) state tensors
+        h = _np.zeros((2, 1, 64), dtype=_np.float32)
+        c = _np.zeros((2, 1, 64), dtype=_np.float32)
+        sr_arr = _np.array(sample_rate, dtype=_np.int64)
+
+        THRESHOLD = 0.5  # speech probability cutoff
+        chunks_speech: List[bool] = []
+
+        for i in range(n_chunks):
+            chunk_raw = raw[i * chunk_bytes:(i + 1) * chunk_bytes]
+            samples = (_np.frombuffer(chunk_raw, dtype=_np.int16)
+                       .astype(_np.float32) / 32768.0)[_np.newaxis, :]  # (1, 512)
+            out = session.run(None, {'input': samples, 'sr': sr_arr, 'h': h, 'c': c})
+            h, c = out[1], out[2]
+            chunks_speech.append(float(out[0].ravel()[0]) >= THRESHOLD)
+
+        # Smooth: collapse short speech bursts (< 150 ms) back to non-speech so
+        # brief transients (keyboard clicks, mouth pops) don't break up silences.
+        frame_ms = chunk_samples * 1000 // sample_rate   # 32 ms per chunk
+        min_speech_frames = max(1, 150 // frame_ms)       # ~4-5 chunks
+        i = 0
+        while i < n_chunks:
+            if chunks_speech[i]:
+                j = i + 1
+                while j < n_chunks and chunks_speech[j]:
+                    j += 1
+                if (j - i) < min_speech_frames:
+                    for k in range(i, j):
+                        chunks_speech[k] = False
+                i = j
+            else:
+                i += 1
+
+        # Build silence intervals from smoothed decisions
+        intervals: List[SilenceInterval] = []
+        silence_start: Optional[float] = None
+
+        for i, is_speech in enumerate(chunks_speech):
+            t = i * chunk_samples / sample_rate
+            if not is_speech:
+                if silence_start is None:
+                    silence_start = t
+            else:
+                if silence_start is not None:
+                    intervals.append(SilenceInterval(silence_start, t))
+                    silence_start = None
+
+        if silence_start is not None:
+            intervals.append(SilenceInterval(silence_start, math.inf))
+
+        return intervals
+
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+
+def parse_silences(ffmpeg_stderr: str) -> List[SilenceInterval]:
+    starts = []
+    intervals: List[SilenceInterval] = []
+    start_re = re.compile(r"silence_start:\s*([0-9]*\.?[0-9]+)")
+    end_re = re.compile(r"silence_end:\s*([0-9]*\.?[0-9]+)")
+
+    for line in ffmpeg_stderr.splitlines():
+        m1 = start_re.search(line)
+        if m1:
+            starts.append(float(m1.group(1)))
+            continue
+        m2 = end_re.search(line)
+        if m2 and starts:
+            s = starts.pop(0)
+            e = float(m2.group(1))
+            if e > s:
+                intervals.append(SilenceInterval(s, e))
+
+    for s in starts:
+        intervals.append(SilenceInterval(s, math.inf))
+
+    intervals.sort(key=lambda x: x.start)
+    return intervals
+
+
+def merge_overlaps(intervals: List[SilenceInterval], duration: float) -> List[SilenceInterval]:
+    fixed = []
+    for iv in intervals:
+        s = max(0.0, iv.start)
+        e = duration if math.isinf(iv.end) else min(duration, iv.end)
+        if e > s:
+            fixed.append(SilenceInterval(s, e))
+    fixed.sort(key=lambda x: x.start)
+
+    merged: List[SilenceInterval] = []
+    for iv in fixed:
+        if not merged:
+            merged.append(iv)
+            continue
+        last = merged[-1]
+        if iv.start <= last.end:
+            last.end = max(last.end, iv.end)
+        else:
+            merged.append(iv)
+    return merged
+
+
+def invert_to_keeps(silences: List[SilenceInterval], duration: float, pad: float, min_keep: float) -> List[
+    Tuple[float, float]]:
+    # 1) Merge silences WITHOUT padding
+    removes = merge_overlaps(silences, duration)
+
+    # 2) Invert to keeps
+    keeps: List[Tuple[float, float]] = []
+    cursor = 0.0
+    for iv in removes:
+        if iv.start > cursor:
+            ks, ke = cursor, iv.start
+            if (ke - ks) >= min_keep:
+                keeps.append((ks, ke))
+        cursor = max(cursor, iv.end)
+
+    if duration > cursor and (duration - cursor) >= min_keep:
+        keeps.append((cursor, duration))
+
+    # 3) Pad the KEEPS outward (what you want)
+    if pad > 0.0 and keeps:
+        padded = []
+        for a, b in keeps:
+            a2 = max(0.0, a - pad)
+            b2 = min(duration, b + pad)
+            if b2 > a2:
+                padded.append((a2, b2))
+
+        # Merge overlaps caused by padding
+        padded.sort(key=lambda x: x[0])
+        merged: List[Tuple[float, float]] = []
+        for a, b in padded:
+            if not merged:
+                merged.append((a, b))
+                continue
+            la, lb = merged[-1]
+            if a <= lb:
+                merged[-1] = (la, max(lb, b))
+            else:
+                merged.append((a, b))
+
+        keeps = merged
+
+    return keeps
+
+
+def keeps_to_removes(keeps: List[Tuple[float, float]], duration: float) -> List[Tuple[float, float]]:
+    removes: List[Tuple[float, float]] = []
+    cursor = 0.0
+    for ks, ke in keeps:
+        if ks > cursor:
+            removes.append((cursor, ks))
+        cursor = max(cursor, ke)
+    if duration > cursor:
+        removes.append((cursor, duration))
+    return [(a, b) for a, b in removes if b > a]
+
+
+def sar_to_par(sar: str) -> Tuple[int, int]:
+    if not sar or ":" not in sar:
+        return (1, 1)
+    a, b = sar.split(":", 1)
+    try:
+        a_i = int(a)
+        b_i = int(b)
+        if a_i <= 0 or b_i <= 0:
+            return (1, 1)
+        return (a_i, b_i)
+    except:
+        return (1, 1)
+
+
+def field_order_to_fcp(field: str) -> str:
+    f = (field or "").lower()
+    if f == "progressive" or f == "unknown" or f == "":
+        return "none"
+    if f in ("tt", "tb"):
+        return "upper"
+    if f in ("bb", "bt"):
+        return "lower"
+    return "none"
+
+
+def make_fcp7_xml(link_media_path: str, keeps: List[Tuple[float, float]], seq_name: str) -> str:
+    dur = get_duration_seconds(link_media_path)
+    info = get_media_info(link_media_path)
+
+    width = int(info.get("width", "1920"))
+    height = int(info.get("height", "1080"))
+    fps = parse_rate(info.get("avg_frame_rate") or info.get("r_frame_rate") or "30/1")
+    timebase, ntsc, fps_real = fps_to_timebase_ntsc_and_real_fps(fps)
+
+    sample_rate = int(info.get("sample_rate", "48000"))
+    channels = 1
+    sar = info.get("sample_aspect_ratio", "1:1")
+    par_n, par_d = sar_to_par(sar)
+    field = field_order_to_fcp(info.get("field_order", "progressive"))
+
+    abs_path = os.path.abspath(link_media_path).replace("\\", "/")
+    pathurl = "file:///" + abs_path
+
+    v_track_items = []
+    a_track_items = []
+
+    timeline_cursor = 0.0
+    for i, (ks, ke) in enumerate(keeps, start=1):
+        seg_dur = max(0.0, ke - ks)
+        if seg_dur <= 0:
+            continue
+
+        v_id = f"clipitem-v{i}"
+        a_id = f"clipitem-a{i}"
+
+        start_f = sec_to_frames(timeline_cursor, fps_real)
+        end_f = sec_to_frames(timeline_cursor + seg_dur, fps_real)
+        in_f = sec_to_frames(ks, fps_real)
+        out_f = sec_to_frames(ke, fps_real)
+
+        file_block = f"""
+            <file id="file-1">
+              <name>{os.path.basename(link_media_path)}</name>
+              <pathurl>{pathurl}</pathurl>
+              <rate>
+                <timebase>{timebase}</timebase>
+                <ntsc>{"TRUE" if ntsc else "FALSE"}</ntsc>
+              </rate>
+              <duration>{sec_to_frames(dur, fps_real)}</duration>
+              <media>
+                <video>
+                  <samplecharacteristics>
+                    <width>{width}</width>
+                    <height>{height}</height>
+                    <anamorphic>FALSE</anamorphic>
+                    <pixelaspectratio>{par_n}/{par_d}</pixelaspectratio>
+                    <fielddominance>{field}</fielddominance>
+                  </samplecharacteristics>
+                </video>
+                <audio>
+                  <samplecharacteristics>
+                    <samplerate>{sample_rate}</samplerate>
+                    <channels>{channels}</channels>
+                  </samplecharacteristics>
+                </audio>
+              </media>
+            </file>
+        """.strip()
+
+        v_item = f"""
+          <clipitem id="{v_id}">
+            <name>{seq_name}_{i:03d}</name>
+            <enabled>TRUE</enabled>
+            <start>{start_f}</start>
+            <end>{end_f}</end>
+            <in>{in_f}</in>
+            <out>{out_f}</out>
+            {file_block}
+            <link>
+              <linkclipref>{v_id}</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>{i}</clipindex>
+            </link>
+            <link>
+              <linkclipref>{a_id}</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>{i}</clipindex>
+            </link>
+          </clipitem>
+        """
+
+        a_item = f"""
+          <clipitem id="{a_id}">
+            <name>{seq_name}_{i:03d}</name>
+            <enabled>TRUE</enabled>
+            <start>{start_f}</start>
+            <end>{end_f}</end>
+            <in>{in_f}</in>
+            <out>{out_f}</out>
+            <file id="file-1"/>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+            </sourcetrack>
+            <link>
+              <linkclipref>{v_id}</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>{i}</clipindex>
+            </link>
+            <link>
+              <linkclipref>{a_id}</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>{i}</clipindex>
+            </link>
+          </clipitem>
+        """
+
+        v_track_items.append(v_item)
+        a_track_items.append(a_item)
+        timeline_cursor += seg_dur
+
+    if not v_track_items:
+        v_track_items.append("""
+          <gap>
+            <name>Empty</name>
+            <duration>1</duration>
+          </gap>
+        """)
+
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xmeml>
+<xmeml version="4">
+  <sequence>
+    <name>{seq_name}</name>
+    <rate>
+      <timebase>{timebase}</timebase>
+      <ntsc>{"TRUE" if ntsc else "FALSE"}</ntsc>
+    </rate>
+    <media>
+      <video>
+        <format>
+          <samplecharacteristics>
+            <rate>
+              <timebase>{timebase}</timebase>
+              <ntsc>{"TRUE" if ntsc else "FALSE"}</ntsc>
+            </rate>
+            <width>{width}</width>
+            <height>{height}</height>
+            <anamorphic>FALSE</anamorphic>
+            <pixelaspectratio>{par_n}/{par_d}</pixelaspectratio>
+            <fielddominance>{field}</fielddominance>
+          </samplecharacteristics>
+        </format>
+        <track>
+          {''.join(v_track_items)}
+        </track>
+      </video>
+      <audio>
+        <format>
+          <samplecharacteristics>
+            <samplerate>{sample_rate}</samplerate>
+            <channels>{channels}</channels>
+          </samplecharacteristics>
+        </format>
+        <track>
+          {''.join(a_track_items)}
+        </track>
+      </audio>
+    </media>
+  </sequence>
+</xmeml>
+"""
+    return xml
+
+
+def compute_plan(input_path: str, threshold: float, min_silence: float, pad: float, min_keep: float,
+                 audio_stream: Optional[str], use_vad: bool = False,
+                 vad_aggressiveness: int = 2) -> Dict[str, Any]:
+    require_tool("ffmpeg")
+    require_tool("ffprobe")
+
+    if not os.path.isfile(input_path):
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+
+    orig_duration = get_duration_seconds(input_path)
+    if use_vad:
+        silences_raw = run_vad_silencedetect(input_path, audio_stream, vad_aggressiveness)
+    else:
+        stderr = run_ffmpeg_silencedetect(input_path, threshold, min_silence, audio_stream)
+        silences_raw = parse_silences(stderr)
+    silences = merge_overlaps(silences_raw, orig_duration)
+    keeps = invert_to_keeps(silences, orig_duration, pad, min_keep)
+    removes = keeps_to_removes(keeps, orig_duration)
+
+    kept_total = sum(max(0.0, b - a) for a, b in keeps)
+    removed_total = sum(max(0.0, b - a) for a, b in removes)
+
+    return {
+        "duration": orig_duration,
+        "keeps": keeps,
+        "removes": removes,
+        "kept_total": kept_total,
+        "removed_total": removed_total,
+        "silences_count": len(silences),
+        "keeps_count": len(keeps),
+    }
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input", help="Input video/audio file")
+    parser.add_argument("--threshold", type=float, default=-35)
+    parser.add_argument("--min_silence", type=float, default=0.25)
+    parser.add_argument("--pad", type=float, default=0.08)
+    parser.add_argument("--min_keep", type=float, default=0.10)
+    parser.add_argument("--audio_stream", default=None)
+    parser.add_argument("--regen_mono", action="store_true")
+    parser.add_argument("--use_vad", action="store_true")
+    parser.add_argument("--vad_aggressiveness", type=int, default=2)
+    args = parser.parse_args(argv)
+
+    require_tool("ffmpeg")
+    require_tool("ffprobe")
+
+    if not os.path.isfile(args.input):
+        print("Input file not found:", args.input, file=sys.stderr)
+        return 1
+
+    in_dir = os.path.dirname(os.path.abspath(args.input))
+    base = os.path.splitext(os.path.basename(args.input))[0]
+    mono_path = os.path.join(in_dir, f"__SILENCECUT_MONO_PROXY__{base}.mov")
+
+    if args.regen_mono or not os.path.isfile(mono_path) or os.path.getsize(mono_path) == 0:
+        print("Creating mono proxy:", mono_path)
+        create_mono_proxy(args.input, mono_path, sample_rate=48000)
+    else:
+        print("Using existing mono proxy:", mono_path)
+
+    plan = compute_plan(args.input, args.threshold, args.min_silence, args.pad, args.min_keep, args.audio_stream,
+                        use_vad=args.use_vad, vad_aggressiveness=args.vad_aggressiveness)
+    keeps = plan["keeps"]
+
+    print(f"Detected silences: {plan['silences_count']} | Kept segments: {plan['keeps_count']}")
+
+    seq_name = f"{base}_NoSilence"
+    out_xml = os.path.join(in_dir, f"{base}__nosilence.XML")
+
+    xml = make_fcp7_xml(mono_path, keeps, seq_name)
+    with open(out_xml, "w", encoding="utf-8", newline="\n") as f:
+        f.write(xml)
+
+    print("Wrote:", out_xml)
+    print("Linked media (mono proxy):", mono_path)
+    print(
+        f"Original duration: {plan['duration'] / 60:.3f}m | Kept: {plan['kept_total'] / 60:.3f}m | Segments: {plan['keeps_count']}")
+    print("Import the .XML into Premiere. It should create a sequence matching the proxy (resolution/fps/etc).")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

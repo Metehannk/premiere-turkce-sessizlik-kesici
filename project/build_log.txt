@@ -1,0 +1,37 @@
+=== BUILD START ===
+CWD: C:\Users\meteh\Desktop\premier otomatik kesme uygulamas\project
+PY: C:\Users\meteh\AppData\Local\Programs\Python\Python313\python.exe
+PYI: C:\Users\meteh\AppData\Local\Programs\Python\Python313\Scripts\pyinstaller.exe
+BUILD_CONSOLE: 0
+APPDATA: C:\Users\meteh\AppData\Roaming
+Python 3.13.5
+Checking pip...
+pip 25.2 from C:\Users\meteh\AppData\Local\Programs\Python\Python313\Lib\site-packages\pip (python 3.13)
+Ensuring python-vlc is installed...
+Requirement already satisfied: python-vlc in c:\users\meteh\appdata\roaming\python\python313\site-packages (3.0.21203)
+
+[notice] A new release of pip is available: 25.2 -> 26.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+Installing onnxruntime and numpy (for VAD)...
+Requirement already satisfied: onnxruntime in c:\users\meteh\appdata\roaming\python\python313\site-packages (1.25.0)
+Collecting onnxruntime
+  Downloading onnxruntime-1.25.1-cp313-cp313-win_amd64.whl.metadata (5.5 kB)
+Requirement already satisfied: numpy in c:\users\meteh\appdata\roaming\python\python313\site-packages (2.4.4)
+Requirement already satisfied: flatbuffers in c:\users\meteh\appdata\roaming\python\python313\site-packages (from onnxruntime) (25.12.19)
+Requirement already satisfied: packaging in c:\users\meteh\appdata\local\programs\python\python313\lib\site-packages (from onnxruntime) (25.0)
+Requirement already satisfied: protobuf in c:\users\meteh\appdata\roaming\python\python313\site-packages (from onnxruntime) (7.34.1)
+Downloading onnxruntime-1.25.1-cp313-cp313-win_amd64.whl (12.9 MB)
+   ---------------------------------------- 12.9/12.9 MB 5.6 MB/s  0:00:02
+Installing collected packages: onnxruntime
+  Attempting uninstall: onnxruntime
+    Found existing installation: onnxruntime 1.25.0
+    Uninstalling onnxruntime-1.25.0:
+      Successfully uninstalled onnxruntime-1.25.0
+  WARNING: The script onnxruntime_test.exe is installed in 'C:\Users\meteh\AppData\Roaming\Python\Python313\Scripts' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+Successfully installed onnxruntime-1.25.1
+
+[notice] A new release of pip is available: 25.2 -> 26.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+silero_vad.onnx already present.
+Cleaning build/dist...
