@@ -97,7 +97,7 @@ def _script_path():
 def _load_module_from_path(module_name: str, path: str):
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"Failed to load spec for: {path}")
+        raise RuntimeError(f"{path} için modül tanımlaması yüklenemedi.")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -248,50 +248,85 @@ class App(tk.Tk):
         except:
             pass
 
-        bg = "#121416"
-        panel = "#1b1f24"
-        panel2 = "#161a1f"
-        fg = "#e6e6e6"
-        muted = "#b5b5b5"
-        border = "#2a3038"
-        accent = "#3a86ff"
-        danger = "#d84a4a"
-        ok = "#43c46b"
+        bg = "#121212"  # Studio Deep Grey
+        panel = "#1E1E1E"  # Professional panel grey
+        panel2 = "#2A2A2A"  # Interactive elements
+        fg = "#FFFFFF"  # Pure white for contrast
+        muted = "#B0B0B0"  # Muted text
+        border = "#404040"  # Subtle borders
+        accent = "#8B5CF6"  # Premiere Purple
+        accent2 = "#0EA5E9"  # Azure Blue
+        danger = "#EF4444"  # Modern red
+        ok = "#10B981"  # Modern green
+        timeline_bg = "#1A1A1A"  # Timeline background
+        grid_color = "#333333"  # Grid lines
+        cut_color = "#DC2626"  # Cut regions
+        keep_color = "#059669"  # Keep regions
 
-        # Base window
         self.configure(bg=bg)
         style.configure(".", background=bg, foreground=fg, fieldbackground=panel, bordercolor=border)
         style.configure("TFrame", background=bg)
-        style.configure("TLabelframe", background=bg, foreground=fg, bordercolor=border)
-        style.configure("TLabelframe.Label", background=bg, foreground=fg, font=("Segoe UI", 11, "bold"))
+        style.configure("TLabelframe", background=panel, foreground=fg, bordercolor=border)
+        style.configure("TLabelframe.Label", background=panel, foreground=fg, font=("Segoe UI", 11, "bold"))
 
         style.configure("TLabel", background=bg, foreground=fg, font=("Segoe UI", 10))
-        style.configure("Muted.TLabel", background=bg, foreground=muted, font=("Segoe UI", 10))
+        style.configure("Muted.TLabel", background=bg, foreground=muted, font=("Segoe UI", 9))
 
-        style.configure("TEntry", fieldbackground=panel, foreground=fg, insertcolor=fg)
-        style.map("TEntry", fieldbackground=[("disabled", panel2)])
+        style.configure("TEntry", fieldbackground=panel2, foreground=fg, insertcolor=fg)
+        style.map("TEntry", fieldbackground=[("disabled", panel)])
 
-        style.configure("TButton", background=panel, foreground=fg, bordercolor=border, focusthickness=0,
-                        padding=(10, 7))
+        # Professional flat button design with smooth transitions
+        style.configure("TButton", 
+                        background=panel2, 
+                        foreground=fg, 
+                        bordercolor=border, 
+                        focusthickness=0,
+                        padding=(16, 8), 
+                        relief="flat", 
+                        font=("Segoe UI", 10, "normal"),
+                        focuscolor="none")
         style.map(
             "TButton",
-            background=[("active", "#222831"), ("pressed", "#20262d")],
-            foreground=[("disabled", "#777777")]
+            background=[("active", "#333333"), ("pressed", "#404040"), ("disabled", "#1A1A1A")],
+            foreground=[("disabled", "#666666")],
+            relief=[("pressed", "flat"), ("!pressed", "flat")],
+            bordercolor=[("active", accent), ("!active", border)]
         )
+        
+        # Accent buttons for primary actions
+        style.configure("Accent.TButton", 
+                        background=accent, 
+                        foreground="#FFFFFF", 
+                        padding=(20, 10), 
+                        relief="flat", 
+                        font=("Segoe UI", 10, "bold"),
+                        focuscolor="none")
+        style.map("Accent.TButton", 
+                 background=[("active", "#7C3AED"), ("pressed", "#6D28D9"), ("disabled", "#4C1D95")],
+                 foreground=[("disabled", "#A78BFA")],
+                 relief=[("pressed", "flat"), ("!pressed", "flat")])
+        
+        # Secondary accent for auxiliary buttons
+        style.configure("Secondary.TButton", 
+                        background=accent2, 
+                        foreground="#FFFFFF", 
+                        padding=(14, 8), 
+                        relief="flat", 
+                        font=("Segoe UI", 9),
+                        focuscolor="none")
+        style.map("Secondary.TButton", 
+                 background=[("active", "#0284C7"), ("pressed", "#0369A1")],
+                 relief=[("pressed", "flat"), ("!pressed", "flat")])
 
-        style.configure("Accent.TButton", background=accent, foreground="#ffffff", padding=(10, 7))
-        style.map("Accent.TButton", background=[("active", "#2f6fe0"), ("pressed", "#2a63c9")])
-
-        style.configure("TCheckbutton", background=bg, foreground=fg)
+        style.configure("TCheckbutton", background=bg, foreground=fg, font=("Segoe UI", 10))
         style.map("TCheckbutton", background=[("active", bg)])
 
         style.configure("Horizontal.TScale", background=bg)
 
-        style.configure("TScrollbar", background=panel, troughcolor=panel2, bordercolor=border, arrowcolor=fg)
+        style.configure("TScrollbar", background=panel2, troughcolor=panel, bordercolor=border, arrowcolor=fg)
 
-        # If you use a Text widget for logs, style it manually after creating it:
-        self._theme_colors = dict(bg=bg, panel=panel, panel2=panel2, fg=fg, muted=muted, border=border, accent=accent,
-                                  danger=danger, ok=ok)
+        self._theme_colors = dict(bg=bg, panel=panel, panel2=panel2, fg=fg, muted=muted, border=border, accent=accent, accent2=accent2,
+                                  danger=danger, ok=ok, timeline_bg=timeline_bg, grid_color=grid_color, cut_color=cut_color, keep_color=keep_color)
 
     def _install_hotkeys(self):
         # 1) Kill the default "Space/Enter activates focused button" behavior.
@@ -469,8 +504,8 @@ class App(tk.Tk):
 
                 dur = self._plan["duration"]
                 self.preview_status.set(
-                    f"Duration {_sec_to_hhmmss(dur)} · Keep {_sec_to_hhmmss(self._plan['kept_total'])} · "
-                    f"Cut {_sec_to_hhmmss(self._plan['removed_total'])} · Segments {self._plan['keeps_count']}"
+                    f"Süre {_sec_to_hhmmss(dur)} · Sakla {_sec_to_hhmmss(self._plan['kept_total'])} · "
+                f"Kes {_sec_to_hhmmss(self._plan['removed_total'])} · Segmentler {self._plan['keeps_count']}"
                 )
             else:
                 self._plan = None
@@ -495,49 +530,49 @@ class App(tk.Tk):
 
     # ---------------- UI ----------------
     def _build_ui(self):
-        root = ttk.Frame(self, padding=10)
+        root = ttk.Frame(self, padding=16)
         root.pack(fill="both", expand=True)
 
         layout = ttk.Panedwindow(root, orient="horizontal")
         layout.pack(fill="both", expand=True)
 
-        left = ttk.Frame(layout, padding=10)
+        left = ttk.Frame(layout, padding=16)
         layout.add(left, weight=0)
-        left.configure(width=340)
+        left.configure(width=360)
         left.pack_propagate(False)
 
-        right = ttk.Frame(layout, padding=10)
+        right = ttk.Frame(layout, padding=16)
         layout.add(right, weight=1)
 
-        file_box = ttk.LabelFrame(left, text="Media", padding=10)
-        file_box.pack(fill="x")
+        file_box = ttk.LabelFrame(left, text="Medya", padding=16)
+        file_box.pack(fill="x", pady=(0, 16))
         ttk.Entry(file_box, textvariable=self.input_path).pack(fill="x")
         btns = ttk.Frame(file_box)
         btns.pack(fill="x", pady=(8, 0))
-        ttk.Button(btns, text="Browse…", command=self.pick_file).pack(side="left", fill="x", expand=True)
-        ttk.Button(btns, text="Reset", command=self.reset_defaults).pack(side="left", padx=(8, 0), fill="x",
+        ttk.Button(btns, text="Dosya Seç…", command=self.pick_file).pack(side="left", fill="x", expand=True)
+        ttk.Button(btns, text="Sıfırla", command=self.reset_defaults).pack(side="left", padx=(8, 0), fill="x",
                                                                          expand=True)
 
-        settings_box = ttk.LabelFrame(left, text="Cut Settings", padding=10)
-        settings_box.pack(fill="x", pady=(10, 0))
+        settings_box = ttk.LabelFrame(left, text="Kesme Ayarları", padding=16)
+        settings_box.pack(fill="x", pady=(0, 16))
 
         def row(label, var):
             rr = ttk.Frame(settings_box)
-            rr.pack(fill="x", pady=4)
-            ttk.Label(rr, text=label).pack(side="left")
-            ttk.Entry(rr, textvariable=var, width=10).pack(side="right", fill="x", expand=True)
+            rr.pack(fill="x", pady=6)
+            ttk.Label(rr, text=label, font=("Segoe UI", 10, "bold")).pack(side="left")
+            ttk.Entry(rr, textvariable=var, width=10, font=("Segoe UI", 10)).pack(side="right", fill="x", expand=True)
 
-        row("Threshold (dB)", self.threshold)
-        row("Min silence (s)", self.min_silence)
-        row("Pad (s)", self.pad)
-        row("Min keep (s)", self.min_keep)
+        row("Eşik Değeri (dB)", self.threshold)
+        row("Minimum Sessizlik (s)", self.min_silence)
+        row("Dolgu (s)", self.pad)
+        row("Minimum Tutma (s)", self.min_keep)
 
         rr = ttk.Frame(settings_box)
         rr.pack(fill="x", pady=4)
-        ttk.Label(rr, text="Audio stream").pack(side="left")
+        ttk.Label(rr, text="Ses Akışı").pack(side="left")
         ttk.Entry(rr, textvariable=self.audio_stream).pack(side="right", fill="x", expand=True)
 
-        ttk.Checkbutton(settings_box, text="Re-create mono proxy", variable=self.regen_mono).pack(anchor="w",
+        ttk.Checkbutton(settings_box, text="Mono proxy yeniden oluştur", variable=self.regen_mono).pack(anchor="w",
                                                                                                   pady=(6, 0))
 
         import importlib.util as _ilu
@@ -552,47 +587,47 @@ class App(tk.Tk):
                           for d in _model_dirs)
         if _ort_ok:
             vad_state = "normal"
-            vad_tip = "Use speech detection (VAD)"
+            vad_tip = "Konuşma algılaması (VAD) kullan"
         else:
             vad_state = "disabled"
-            vad_tip = "Use speech detection (VAD)  [onnxruntime or silero_vad.onnx not found — run build.bat]"
+            vad_tip = "Konuşma algılaması (VAD)  [onnxruntime veya silero_vad.onnx bulunamadı — build.bat çalıştırın]"
 
         self._vad_cb = ttk.Checkbutton(settings_box, text=vad_tip,
                                         variable=self.use_vad, state=vad_state)
         self._vad_cb.pack(anchor="w", pady=(4, 0))
 
-        actions = ttk.LabelFrame(left, text="Actions", padding=10)
-        actions.pack(fill="x", pady=(10, 0))
+        actions = ttk.LabelFrame(left, text="Eylemler", padding=16)
+        actions.pack(fill="x", pady=(0, 16))
         act_row = ttk.Frame(actions)
         act_row.pack(fill="x")
-        ttk.Button(act_row, text="Analyze", command=self.analyze_preview).pack(side="left", fill="x", expand=True)
-        ttk.Button(act_row, text="Generate XML", command=self.run).pack(side="left", padx=(8, 0), fill="x", expand=True)
+        ttk.Button(act_row, text="Analiz Et", style="Accent.TButton", command=self.analyze_preview).pack(side="left", fill="x", expand=True)
+        ttk.Button(act_row, text="XML Oluştur", style="Accent.TButton", command=self.run).pack(side="left", padx=(8, 0), fill="x", expand=True)
 
-        self.preview_status = tk.StringVar(value="(No analysis yet)")
+        self.preview_status = tk.StringVar(value="(Henüz analiz yok)")
         ttk.Label(actions, textvariable=self.preview_status, wraplength=300).pack(fill="x", pady=(8, 0))
 
-        player_box = ttk.LabelFrame(right, text="Preview", padding=10)
+        player_box = ttk.LabelFrame(right, text="Önizleme", padding=16)
         player_box.pack(fill="both", expand=True)
 
-        self.player_surface = tk.Frame(player_box, bg="black", height=420)
+        self.player_surface = tk.Frame(player_box, bg="#1A1A1A", height=420)
         self.player_surface.pack(fill="x", expand=False)
         self.player_surface.pack_propagate(False)
 
         transport = ttk.Frame(player_box)
-        transport.pack(fill="x", pady=(8, 0))
+        transport.pack(fill="x", pady=(12, 0))
 
         ttk.Button(transport, text="⏯", width=4, command=self.player_toggle_play).pack(side="left")
-        ttk.Button(transport, text="⏹", width=4, command=self.player_stop).pack(side="left", padx=(6, 0))
+        ttk.Button(transport, text="⏹", width=4, command=self.player_stop).pack(side="left", padx=(8, 0))
 
-        ttk.Button(transport, text="Prev Cut", command=self.jump_prev_cut).pack(side="left", padx=(10, 0))
-        ttk.Button(transport, text="Next Cut", command=self.jump_next_cut).pack(side="left", padx=(6, 0))
+        ttk.Button(transport, text="Önceki Kesit", style="Secondary.TButton", command=self.jump_prev_cut).pack(side="left", padx=(12, 0))
+        ttk.Button(transport, text="Sonraki Kesit", style="Secondary.TButton", command=self.jump_next_cut).pack(side="left", padx=(8, 0))
 
         ttk.Button(transport, text="⏮ 1s", width=6, command=lambda: self.player_nudge(-1.0)).pack(side="left",
-                                                                                                  padx=(10, 0))
+                                                                                                  padx=(12, 0))
         ttk.Button(transport, text="1s ⏭", width=6, command=lambda: self.player_nudge(1.0)).pack(side="left",
-                                                                                                 padx=(6, 0))
+                                                                                                 padx=(8, 0))
 
-        ttk.Label(transport, text="Vol").pack(side="left", padx=(14, 6))
+        ttk.Label(transport, text="Ses").pack(side="left", padx=(14, 6))
         self.vol_slider = ttk.Scale(transport, from_=0, to=100, orient="horizontal", command=self.on_volume_slider)
         self.vol_slider.pack(side="left", fill="x", expand=True)
         self.vol_slider.set(float(self.volume.get()))
@@ -601,9 +636,9 @@ class App(tk.Tk):
         ttk.Label(transport, textvariable=self.time_label).pack(side="right")
 
         timeline_box = ttk.Frame(player_box)
-        timeline_box.pack(fill="x", pady=(10, 0))
+        timeline_box.pack(fill="x", pady=(16, 0))
 
-        self.timeline_canvas = tk.Canvas(timeline_box, height=66, highlightthickness=1)
+        self.timeline_canvas = tk.Canvas(timeline_box, height=80, highlightthickness=1)
         self.timeline_canvas.pack(side="top", fill="x", expand=True)
         self.timeline_canvas.bind("<Button-1>", self.on_timeline_click)
         self.timeline_canvas.bind("<Configure>", lambda e: self._draw_all_timelines())
@@ -615,7 +650,7 @@ class App(tk.Tk):
 
         # Premiere-style overview / dragger
         overview_box = ttk.Frame(player_box)
-        overview_box.pack(fill="x", pady=(6, 0))
+        overview_box.pack(fill="x", pady=(12, 0))
 
         self.overview_canvas = tk.Canvas(overview_box, height=self._overview_h, highlightthickness=1)
         self.overview_canvas.pack(fill="x")
@@ -624,23 +659,23 @@ class App(tk.Tk):
         self.overview_canvas.bind("<B1-Motion>", self.on_overview_drag)
         self.overview_canvas.bind("<ButtonRelease-1>", self.on_overview_up)
 
-        log_box = ttk.LabelFrame(right, text="Log", padding=10)
-        log_box.pack(fill="both", expand=False, pady=(10, 0))
+        log_box = ttk.LabelFrame(right, text="Kayıt", padding=16)
+        log_box.pack(fill="both", expand=False, pady=(16, 0))
         self.log = tk.Text(log_box, height=10, wrap="word")
         self.log.pack(fill="both", expand=True)
 
         c = self._theme_colors
-        self.log.configure(bg=c["panel2"], fg=c["fg"], insertbackground=c["fg"], selectbackground="#2b4a7a",
+        self.log.configure(bg=c["panel2"], fg=c["fg"], insertbackground=c["fg"], selectbackground="#4B65A4",
                            relief="flat", highlightthickness=1, highlightbackground=c["border"])
-        self.timeline_canvas.configure(bg="#121416", highlightbackground=self._theme_colors["border"])
-        self.overview_canvas.configure(bg="#121416", highlightbackground=self._theme_colors["border"])
+        self.timeline_canvas.configure(bg=c["timeline_bg"], highlightbackground=self._theme_colors["border"])
+        self.overview_canvas.configure(bg=c["timeline_bg"], highlightbackground=self._theme_colors["border"])
 
         self._append_log(
-            "Tips:\n"
-            "- Pick a file: auto-loads into the player.\n"
-            "- Ctrl + Mousewheel on the timeline to zoom.\n"
-            "- Drag the small overview viewport like Premiere to pan.\n"
-            "- Click the main timeline to seek.\n\n"
+            "İpuçları:\n"
+            "- Dosya seçin: medya otomatik olarak yüklenir.\n"
+            "- Zaman çizelgesinde Ctrl + Fare tekerleği ile yakınlaştırın.\n"
+            "- Genel görünümü sürükleyerek pan yapın.\n"
+            "- Ana zaman çizelgesine tıklayarak konum atlayın.\n\n"
         )
 
         self._draw_all_timelines()
@@ -664,8 +699,8 @@ class App(tk.Tk):
     # ---------------- File picker + auto-load ----------------
     def pick_file(self):
         path = filedialog.askopenfilename(
-            title="Select video/audio file",
-            filetypes=[("Media files", "*.mp4 *.mov *.mkv *.wav *.mp3 *.m4a *.aac *.flac *.avi"), ("All files", "*.*")],
+            title="Video/ses dosyası seç",
+            filetypes=[("Medya dosyaları", "*.mp4 *.mov *.mkv *.wav *.mp3 *.m4a *.aac *.flac *.avi"), ("Tüm dosyalar", "*.*")],
         )
         if path:
             self.input_path.set(path)
@@ -759,40 +794,86 @@ class App(tk.Tk):
     def _draw_main_timeline(self):
         c = self.timeline_canvas
         c.delete("all")
-        h = 66
-        pad_y = 10
+        h = 80
+        pad_y = 15
         y0, y1 = pad_y, h - pad_y
         w = self._timeline_total_w
 
         c.config(scrollregion=(0, 0, w, h))
-        c.create_rectangle(0, y0, w, y1, outline="", fill="#222222")
+        
+        # Professional timeline background
+        c.create_rectangle(0, 0, w, h, outline="", fill=self._theme_colors["timeline_bg"])
+        
+        # Main timeline track area
+        c.create_rectangle(0, y0, w, y1, outline="", fill="#252525")
 
         dur = self._timeline_duration()
         if dur <= 0:
-            c.create_text(12, h // 2, anchor="w", fill="#bbbbbb", text="(load a file to enable timeline)")
+            c.create_text(12, h // 2, anchor="w", fill="#B0B0B0", 
+                         text="(zaman çizelgesini etkinleştirmek için dosya yükleyin)", 
+                         font=("Segoe UI", 10))
             return
 
-        if self._plan:
-            removes = self._plan["removes"]
-            keeps = self._plan["keeps"]
-            for a, b in removes:
-                x0, x1 = self._sec_to_x(a), self._sec_to_x(b)
-                if x1 > x0:
-                    c.create_rectangle(x0, y0, x1, y1, outline="", fill="#8a2d2d")
-            for a, b in keeps:
-                x0, x1 = self._sec_to_x(a), self._sec_to_x(b)
-                if x1 > x0:
-                    c.create_rectangle(x0, y0, x1, y1, outline="", fill="#2d8a45")
-
-        step = 10 if dur <= 120 else 30 if dur <= 600 else 60
+        # Draw fine grid lines (every second)
+        grid_sec = 1.0
         t = 0.0
         while t <= dur:
             x = self._sec_to_x(t)
-            c.create_line(x, y1, x, y1 + 6, fill="#aaaaaa")
-            t += step
+            # Main grid lines
+            c.create_line(x, y0, x, y1, fill=self._theme_colors["grid_color"], width=1)
+            # Sub-grid lines (every 0.25 seconds)
+            if t < dur:
+                for sub in [0.25, 0.5, 0.75]:
+                    sub_t = t + sub
+                    if sub_t <= dur:
+                        sub_x = self._sec_to_x(sub_t)
+                        c.create_line(sub_x, y0, sub_x, y1, fill="#2A2A2A", width=1, dash=(2, 4))
+            t += grid_sec
 
+        # Draw regions with semi-transparent gradients
+        if self._plan:
+            removes = self._plan["removes"]
+            keeps = self._plan["keeps"]
+            
+            # Draw cut regions with semi-transparent red
+            for a, b in removes:
+                x0, x1 = self._sec_to_x(a), self._sec_to_x(b)
+                if x1 > x0:
+                    # Main cut region
+                    c.create_rectangle(x0, y0, x1, y1, outline="", fill=self._theme_colors["cut_color"], stipple="gray50")
+                    # Border for definition
+                    c.create_rectangle(x0, y0, x1, y1, outline="#FF6B6B", width=1, fill="")
+            
+            # Draw keep regions with semi-transparent green
+            for a, b in keeps:
+                x0, x1 = self._sec_to_x(a), self._sec_to_x(b)
+                if x1 > x0:
+                    # Main keep region
+                    c.create_rectangle(x0, y0, x1, y1, outline="", fill=self._theme_colors["keep_color"], stipple="gray50")
+                    # Border for definition
+                    c.create_rectangle(x0, y0, x1, y1, outline="#34D399", width=1, fill="")
+
+        # Draw timecode labels
+        timecode_step = 5 if dur <= 60 else 10 if dur <= 300 else 30
+        t = 0.0
+        while t <= dur:
+            x = self._sec_to_x(t)
+            # Major time markers
+            c.create_line(x, y1, x, y1 + 8, fill="#FFFFFF", width=2)
+            # Timecode labels
+            timecode = _sec_to_hhmmss(t)
+            c.create_text(x, h - 2, anchor="s", fill="#FFFFFF", 
+                         text=timecode, font=("Segoe UI", 9, "bold"))
+            t += timecode_step
+
+        # Professional playhead with glow effect
         xph = self._sec_to_x(self._playhead_sec)
-        c.create_line(xph, 0, xph, h, fill="#ffffff", width=2, tags=("playhead",))
+        # Glow effect
+        c.create_line(xph - 1, 0, xph - 1, h, fill="#8B5CF6", width=3)
+        # Main playhead
+        c.create_line(xph, 0, xph, h, fill="#FFFFFF", width=2, tags=("playhead",))
+        # Playhead top triangle
+        c.create_polygon(xph - 5, 0, xph + 5, 0, xph, 8, fill="#8B5CF6", outline="")
 
     def _draw_overview(self):
         o = self.overview_canvas
@@ -803,37 +884,55 @@ class App(tk.Tk):
         self._overview_w = ow
 
         o.config(scrollregion=(0, 0, ow, oh))
-        o.create_rectangle(0, 0, ow, oh, outline="", fill="#1b1b1b")
+        
+        # Professional overview background
+        o.create_rectangle(0, 0, ow, oh, outline="", fill=self._theme_colors["timeline_bg"])
+        
+        # Main overview track area
+        o.create_rectangle(0, 6, ow, oh - 6, outline="", fill="#252525")
 
         dur = self._timeline_duration()
         if dur <= 0:
-            o.create_text(10, oh // 2, anchor="w", fill="#bbbbbb", text="(overview)")
+            o.create_text(10, oh // 2, anchor="w", fill="#B0B0B0", 
+                         text="(genel görünüm)", font=("Segoe UI", 9))
             return
 
         def ox(t: float) -> float:
             return (t / dur) * ow
 
+        # Draw regions in overview with professional styling
         if self._plan:
+            # Cut regions with semi-transparent overlay
             for a, b in self._plan["removes"]:
                 x0, x1 = ox(a), ox(b)
                 if x1 > x0:
-                    o.create_rectangle(x0, 6, x1, oh - 6, outline="", fill="#6c2a2a")
+                    o.create_rectangle(x0, 6, x1, oh - 6, outline="", fill=self._theme_colors["cut_color"], stipple="gray75")
+                    o.create_rectangle(x0, 6, x1, oh - 6, outline="#FF6B6B", width=1, fill="")
+            
+            # Keep regions with semi-transparent overlay
             for a, b in self._plan["keeps"]:
                 x0, x1 = ox(a), ox(b)
                 if x1 > x0:
-                    o.create_rectangle(x0, 6, x1, oh - 6, outline="", fill="#2a6c3f")
+                    o.create_rectangle(x0, 6, x1, oh - 6, outline="", fill=self._theme_colors["keep_color"], stipple="gray75")
+                    o.create_rectangle(x0, 6, x1, oh - 6, outline="#34D399", width=1, fill="")
 
-        # Viewport rectangle
+        # Professional viewport rectangle with gradient effect
         v0, v1 = self._visible_range_sec()
         vx0, vx1 = ox(v0), ox(v1)
         vx1 = max(vx1, vx0 + 12)
 
-        o.create_rectangle(vx0, 3, vx1, oh - 3, outline="#dddddd", width=2, fill="")
-        o.create_rectangle(vx0, 3, vx1, oh - 3, outline="", fill="#ffffff", stipple="gray12")
+        # Viewport shadow/glow effect
+        o.create_rectangle(vx0 + 1, 4, vx1 + 1, oh - 2, outline="#000000", width=2, fill="", stipple="gray25")
+        # Main viewport rectangle
+        o.create_rectangle(vx0, 3, vx1, oh - 3, outline="#8B5CF6", width=2, fill="")
+        o.create_rectangle(vx0, 3, vx1, oh - 3, outline="", fill="#FFFFFF", stipple="gray12")
 
-        # Playhead
+        # Professional playhead
         px = ox(self._playhead_sec)
-        o.create_line(px, 0, px, oh, fill="#ffffff", width=1)
+        # Glow effect
+        o.create_line(px - 1, 0, px - 1, oh, fill="#8B5CF6", width=2)
+        # Main playhead
+        o.create_line(px, 0, px, oh, fill="#FFFFFF", width=1)
 
     # ---------------- Interactions ----------------
     def on_timeline_click(self, ev):
@@ -906,17 +1005,17 @@ class App(tk.Tk):
         self._set_view_center_time(t_center)
         self._draw_overview()
 
-    # ---------------- Analyze ----------------
+    # ---------------- Analiz ----------------
     def analyze_preview(self):
         if self._running:
             return
 
         inp = self.input_path.get().strip()
         if not inp or not os.path.isfile(inp):
-            messagebox.showerror("Missing input", "Please choose a valid media file.")
+            messagebox.showerror("Eksik giriş", "Lütfen geçerli bir medya dosyası seçin.")
             return
 
-        self.preview_status.set("Analyzing…")
+        self.preview_status.set("Analiz ediliyor…")
         self._plan = None
         self._draw_all_timelines()
 
@@ -933,7 +1032,7 @@ class App(tk.Tk):
             try:
                 mod = self._load_cutter()
                 if not hasattr(mod, "compute_plan"):
-                    raise RuntimeError("cut_silence_to_fcpxml.py is missing compute_plan(...).")
+                    raise RuntimeError("cut_silence_to_fcpxml.py içinde compute_plan(...) bulunamadı.")
 
                 with contextlib.redirect_stdout(outw), contextlib.redirect_stderr(errw):
                     plan = mod.compute_plan(inp, threshold, min_silence, pad, min_keep, audio_stream,
@@ -949,7 +1048,7 @@ class App(tk.Tk):
                 segs = plan["keeps_count"]
 
                 self.after(0, lambda: self.preview_status.set(
-                    f"Duration {_sec_to_hhmmss(dur)} · Keep {_sec_to_hhmmss(kept_total)} · Cut {_sec_to_hhmmss(removed_total)} · Segments {segs}"
+                    f"Süre {_sec_to_hhmmss(dur)} · Sakla {_sec_to_hhmmss(kept_total)} · Kes {_sec_to_hhmmss(removed_total)} · Segmentler {segs}"
                 ))
                 self.after(0, self._draw_all_timelines)
 
@@ -960,8 +1059,8 @@ class App(tk.Tk):
                     errw.flush()
                 except:
                     pass
-                self.after(0, lambda: self.preview_status.set("(Analysis failed)"))
-                self.after(0, lambda: messagebox.showerror("Error", _err_msg))
+                self.after(0, lambda: self.preview_status.set("(Analiz başarısız)"))
+                self.after(0, lambda: messagebox.showerror("Hata", _err_msg))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -1049,18 +1148,18 @@ class App(tk.Tk):
         self._set_view_center_time(0.0)
         self._draw_all_timelines()
 
-    # ---------------- Generate XML ----------------
+    # ---------------- XML Oluştur ----------------
     def run(self):
         if self._running:
             return
 
         inp = self.input_path.get().strip()
         if not inp or not os.path.isfile(inp):
-            messagebox.showerror("Missing input", "Please choose a valid media file.")
+            messagebox.showerror("Eksik giriş", "Lütfen geçerli bir medya dosyası seçin.")
             return
 
         argv = self._build_argv(inp)
-        self._append_log("\n---\nRunning…\n\n")
+        self._append_log("\n---\nÇalıştırılıyor…\n\n")
         self._set_running(True)
 
         def worker():
@@ -1070,7 +1169,7 @@ class App(tk.Tk):
             try:
                 mod = self._load_cutter()
                 if not hasattr(mod, "main"):
-                    raise RuntimeError("cut_silence_to_fcpxml.py does not expose main(argv).")
+                    raise RuntimeError("cut_silence_to_fcpxml.py main(argv) fonksiyonunu dışa aktarmıyor.")
 
                 with contextlib.redirect_stdout(outw), contextlib.redirect_stderr(errw):
                     rc = mod.main(argv)
@@ -1084,11 +1183,11 @@ class App(tk.Tk):
                 if rc == 0:
                     base = os.path.splitext(os.path.basename(inp))[0]
                     out_xml = os.path.join(os.path.dirname(os.path.abspath(inp)), f"{base}__nosilence.XML")
-                    self._log_q.put(f"\nDone.\nXML:\n{out_xml}\n")
-                    self.after(0, lambda: messagebox.showinfo("Done", f"Finished!\n\nXML:\n{out_xml}"))
+                    self._log_q.put(f"\nTamamlandı.\nXML:\n{out_xml}\n")
+                    self.after(0, lambda: messagebox.showinfo("Tamamlandı", f"İşlem tamamlandı!\n\nXML:\n{out_xml}"))
                 else:
-                    self._log_q.put(f"\nFailed (exit code {rc}).\n")
-                    self.after(0, lambda: messagebox.showerror("Error", f"Failed (exit code {rc}). See log."))
+                    self._log_q.put(f"\nBaşarısız oldu (çıkış kodu {rc}).\n")
+                    self.after(0, lambda: messagebox.showerror("Hata", f"Başarısız oldu (çıkış kodu {rc}). Günlüğe bakın."))
 
             except Exception as e:
                 _err_msg = str(e)
@@ -1097,8 +1196,8 @@ class App(tk.Tk):
                     errw.flush()
                 except:
                     pass
-                self._log_q.put(f"\nERROR: {_err_msg}\n")
-                self.after(0, lambda: messagebox.showerror("Error", _err_msg))
+                self._log_q.put(f"\nHATA: {_err_msg}\n")
+                self.after(0, lambda: messagebox.showerror("Hata", _err_msg))
             finally:
                 self.after(0, lambda: self._set_running(False))
 
@@ -1108,9 +1207,9 @@ class App(tk.Tk):
     def _init_vlc_if_available(self):
         if self._vlc is None:
             self._append_log(
-                "[VLC] Not available.\n"
-                f"      VLC dir detected: {self._vlc_dll_dir}\n"
-                f"      Error: {self._vlc_err}\n\n"
+                "[VLC] Kullanılamıyor.\n"
+                f"      VLC dizini algılandı: {self._vlc_dll_dir}\n"
+                f"      Hata: {self._vlc_err}\n\n"
             )
             return
 
@@ -1122,7 +1221,7 @@ class App(tk.Tk):
             self._apply_volume()
             self._start_vlc_poll()
         except Exception as e:
-            self._append_log(f"[VLC] Failed to initialize embedded player: {e}\n\n")
+            self._append_log(f"[VLC] Gömülü oynatıcı başlatılamadı: {e}\n\n")
             self._vlc_instance = None
             self._vlc_player = None
 
@@ -1146,17 +1245,17 @@ class App(tk.Tk):
             # IMPORTANT: don't clear plan when restoring session
             if not getattr(self, "_restoring_session", False):
                 self._plan = None
-                self.preview_status.set("(No analysis yet)")
+                self.preview_status.set("(Henüz analiz yok)")
                 self._playhead_sec = 0.0
 
             # If you added the parse-duration async helper, call it here:
             # self._vlc_parse_duration_async(media)
 
             self._draw_all_timelines()
-            self._append_log(f"[VLC] Loaded: {path}\n")
+            self._append_log(f"[VLC] Yüklendi: {path}\n")
 
         except Exception as e:
-            self._append_log(f"[VLC] Load error: {e}\n")
+            self._append_log(f"[VLC] Yükleme hatası: {e}\n")
 
     def player_toggle_play(self):
         if not self._vlc_player:
@@ -1176,7 +1275,7 @@ class App(tk.Tk):
                 self._vlc_load_media(p)
                 self.after(60, lambda: self._vlc_player.play())
         except Exception as e:
-            self._append_log(f"[VLC] Play/Pause error: {e}\n")
+            self._append_log(f"[VLC] Oynatma/Duraklatma hatası: {e}\n")
 
     def player_stop(self):
         if not self._vlc_player:

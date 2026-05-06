@@ -29,15 +29,15 @@ here = os.path.dirname(os.path.abspath(sys.argv[0]))
 script = os.path.join(here, "silencecut_gui.py")
 
 if not os.path.isfile(script):
-    _msg(f"silencecut_gui.py not found next to the launcher.\nExpected:\n{script}")
+    _msg(f"silencecut_gui.py başlatıcıyla aynı dizinde bulunamadı.\nBeklenen:\n{script}")
     sys.exit(1)
 
 py = _find_python()
 if not py:
-    _msg("Python not found on PATH.\nInstall Python 3 and make sure it is on PATH.")
+    _msg("PATH üzerinde Python bulunamadı.\nPython 3'ü yükleyin ve PATH'e ekli olduğundan emin olun.")
     sys.exit(1)
 
 try:
     subprocess.Popen([py, script], cwd=here)
 except Exception as e:
-    _msg(f"Failed to launch Python:\n{py}\n\n{e}")
+    _msg(f"Python başlatılamadı:\n{py}\n\n{e}")

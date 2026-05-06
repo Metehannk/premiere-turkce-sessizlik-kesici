@@ -84,7 +84,7 @@ def run(cmd: List[str], timeout_sec: int = 1800) -> subprocess.CompletedProcess:
 def require_tool(name: str) -> None:
     p = run([name, "-version"])
     if p.returncode != 0:
-        raise FileNotFoundError(f'Could not run "{name}". Make sure it is installed and on PATH.')
+        raise FileNotFoundError(f'"{name}" çalıştırılamadı. Yüklü olduğundan ve PATH üzerinde bulunduğundan emin olun.')
 
 
 def get_duration_seconds(path: str) -> float:
@@ -92,7 +92,7 @@ def get_duration_seconds(path: str) -> float:
            path]
     p = run(cmd)
     if p.returncode != 0 or not p.stdout.strip():
-        raise RuntimeError(f"ffprobe failed to read duration for: {path}\n{p.stderr}")
+        raise RuntimeError(f"ffprobe dosyanın süresini okuyamadı: {path}\n{p.stderr}")
     return float(p.stdout.strip())
 
 
@@ -163,8 +163,8 @@ def create_mono_proxy(input_path: str, mono_path: str, sample_rate: int = 48000)
             or os.path.getsize(mono_path) == 0
     ):
         raise RuntimeError(
-            "Failed to create mono proxy.\n"
-            f"Command: {' '.join(cmd)}\n\n"
+            "Mono proxy oluşturulamadı.\n"
+            f"Komut: {' '.join(cmd)}\n\n"
             f"{p.stderr}"
         )
 
@@ -176,7 +176,7 @@ def run_ffmpeg_silencedetect(path: str, threshold_db: float, min_silence: float,
     cmd += ["-vn", "-ac", "1", "-af", f"silencedetect=noise={threshold_db}dB:d={min_silence}", "-f", "null", "-"]
     p = run(cmd)
     if not p.stderr.strip():
-        raise RuntimeError("ffmpeg produced no silencedetect output; check ffmpeg install and input file.")
+        raise RuntimeError("ffmpeg silencedetect çıktısı üretmedi; ffmpeg yüklemesini ve giriş dosyasını kontrol edin.")
     return p.stderr
 
 
@@ -193,15 +193,14 @@ def _silero_model_path() -> str:
         if os.path.isfile(p):
             return p
     raise RuntimeError(
-        "silero_vad.onnx not found. Re-run build.bat to download it, "
-        "or place the file next to cut_silence_to_fcpxml.py."
+        "silero_vad.onnx bulunamadı. İndirmek için build.bat dosyasını tekrar çalıştırın veya dosyayı cut_silence_to_fcpxml.py ile aynı klasöre yerleştirin."
     )
 
 
 def run_vad_silencedetect(path: str, audio_stream: Optional[str],
                            aggressiveness: int = 2) -> List[SilenceInterval]:
     if _ort is None:
-        raise RuntimeError(f"onnxruntime could not be loaded: {_VAD_ERR}")
+        raise RuntimeError(f"onnxruntime yüklenemedi: {_VAD_ERR}")
 
     session = _ort.InferenceSession(_silero_model_path(),
                                     providers=['CPUExecutionProvider'])
@@ -221,7 +220,7 @@ def run_vad_silencedetect(path: str, audio_stream: Optional[str],
         cmd += ["-vn", "-ac", "1", "-ar", str(sample_rate), "-f", "s16le", tmp_path]
         p = run(cmd)
         if p.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed to extract audio for VAD.\n{p.stderr}")
+            raise RuntimeError(f"ffmpeg VAD için sesi çıkartamadı.\n{p.stderr}")
 
         with open(tmp_path, "rb") as f:
             raw = f.read()
@@ -597,7 +596,7 @@ def compute_plan(input_path: str, threshold: float, min_silence: float, pad: flo
     require_tool("ffprobe")
 
     if not os.path.isfile(input_path):
-        raise FileNotFoundError(f"Input file not found: {input_path}")
+        raise FileNotFoundError(f"Giriş dosyası bulunamadı: {input_path}")
 
     orig_duration = get_duration_seconds(input_path)
     if use_vad:
@@ -625,7 +624,7 @@ def compute_plan(input_path: str, threshold: float, min_silence: float, pad: flo
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", help="Input video/audio file")
+    parser.add_argument("input", help="Giriş video/ses dosyası")
     parser.add_argument("--threshold", type=float, default=-35)
     parser.add_argument("--min_silence", type=float, default=0.25)
     parser.add_argument("--pad", type=float, default=0.08)
@@ -640,7 +639,7 @@ def main(argv=None):
     require_tool("ffprobe")
 
     if not os.path.isfile(args.input):
-        print("Input file not found:", args.input, file=sys.stderr)
+        print("Giriş dosyası bulunamadı:", args.input, file=sys.stderr)
         return 1
 
     in_dir = os.path.dirname(os.path.abspath(args.input))
@@ -648,16 +647,16 @@ def main(argv=None):
     mono_path = os.path.join(in_dir, f"__SILENCECUT_MONO_PROXY__{base}.mov")
 
     if args.regen_mono or not os.path.isfile(mono_path) or os.path.getsize(mono_path) == 0:
-        print("Creating mono proxy:", mono_path)
+        print("Mono proxy oluşturuluyor:", mono_path)
         create_mono_proxy(args.input, mono_path, sample_rate=48000)
     else:
-        print("Using existing mono proxy:", mono_path)
+        print("Mevcut mono proxy kullanılıyor:", mono_path)
 
     plan = compute_plan(args.input, args.threshold, args.min_silence, args.pad, args.min_keep, args.audio_stream,
                         use_vad=args.use_vad, vad_aggressiveness=args.vad_aggressiveness)
     keeps = plan["keeps"]
 
-    print(f"Detected silences: {plan['silences_count']} | Kept segments: {plan['keeps_count']}")
+    print(f"Algılanan sessizlikler: {plan['silences_count']} | Saklanan segmentler: {plan['keeps_count']}")
 
     seq_name = f"{base}_NoSilence"
     out_xml = os.path.join(in_dir, f"{base}__nosilence.XML")
@@ -666,11 +665,11 @@ def main(argv=None):
     with open(out_xml, "w", encoding="utf-8", newline="\n") as f:
         f.write(xml)
 
-    print("Wrote:", out_xml)
-    print("Linked media (mono proxy):", mono_path)
+    print("Yazıldı:", out_xml)
+    print("Bağlı medya (mono proxy):", mono_path)
     print(
-        f"Original duration: {plan['duration'] / 60:.3f}m | Kept: {plan['kept_total'] / 60:.3f}m | Segments: {plan['keeps_count']}")
-    print("Import the .XML into Premiere. It should create a sequence matching the proxy (resolution/fps/etc).")
+        f"Orijinal süre: {plan['duration'] / 60:.3f}dk | Saklanan: {plan['kept_total'] / 60:.3f}dk | Segmentler: {plan['keeps_count']}")
+    print("XML dosyasını Premiere'e aktarın. Proxy ile eşleşen bir sekans oluşturması gerekir (çözünürlük/fps vb).")
     return 0
 
 
