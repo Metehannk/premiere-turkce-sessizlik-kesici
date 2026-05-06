@@ -1,26 +1,47 @@
-Screw AutoCut and their stupid monthly subscription for such a simple application.
+Daha ciddi, profesyonel ve SEO odaklı bir metin hazırladım. Bu metin, hem kullanıcıyı teknik olarak bilgilendiriyor hem de aracın ticari rakiplerine göre avantajlarını öne çıkarıyor.
 
-SilenceCut is a desktop tool that automatically removes silence from video or audio files and generates a Final Cut Pro XML timeline with only the meaningful content preserved.
-Designed for fast cleanup of recordings, voiceovers, and gameplay footage before bringing them into an editor.
+Premiere Pro Otomatik Türkçe Sessizlik ve Boşluk Kesme Aracı
+AutoCut ve benzeri yazılımların talep ettiği yüksek abonelik ücretlerine son verin. Bu yazılım, video ve ses içeriklerinizdeki sessiz bölümleri, duraksamaları ve gereksiz nefes boşluklarını yapay zeka destekli analiz yöntemiyle saniyeler içinde temizleyen ücretsiz bir kurgu asistanıdır.
 
-It lets you:
-- Preview your media with embedded playback
-- Visually inspect kept vs cut sections on a timeline
-- Tune silence detection parameters (threshold, padding, minimum keep time)
-- Jump between cuts, scrub, and zoom the timeline like a real editor
-- Reopen the app and continue exactly where you left off
-- Analyze based on speech so keyboard sounds get automatically cut out
+Kullanım Alanları ve Avantajları
+Bu araç, içerik üretim sürecindeki en sıkıcı aşama olan ham görüntü kesme işlemini otomatize ederek iş yükünüzü %90 oranında azaltır:
 
-This isn't super well documented and I'm not planning on supporting it too well so good luck with everything, but just run the build.bat and open the built .exe in /dist
+YouTuberlar ve VLOG Üreticileri: Konuşma aralarındaki ölü zamanları ve "eee, ııı" gibi duraksamaları saniyeler içinde yok ederek akıcı "Jump Cut" kurgular oluşturur.
 
-You need VLC (MAKE SURE IT IS THE x64 VERSION, I MEAN IT) and python-vlc to build it. 
+Eğitim İçerikleri ve Kurs Videoları: Ders anlatımı sırasındaki uzun sessizlikleri ve istenmeyen nefes seslerini temizleyerek profesyonel bir sunum sağlar.
 
-Usage:
-1. Browse for a video file
-2. Analyze it
-3. When you're happy with the cut segments hit Generate XML
-4. Import the generated XML into premiere, it'll automatically detect it as a sequence
-5. Enjoy :)
+Podcast ve Ses Kayıtları: Saatlerce süren ham kayıtları hızlıca tarayarak sadece sesin olduğu kısımları ayıklar.
 
+Oyuncular (Gaming): Aksiyonun olmadığı veya konuşmanın kesildiği uzun bölümleri otomatik olarak eler.
 
-<img width="1438" height="802" alt="image" src="https://github.com/user-attachments/assets/734435b6-b167-4abb-9c12-40b23629e5c6" />
+Teknik Özellikler
+Gelişmiş Ses Analizi: Sadece mutlak sessizliği değil, eşik değeri (threshold) ayarı sayesinde arka plandaki tıkırtıları ve nefes alışverişlerini de ayırt eder.
+
+Premiere Pro XML Entegrasyonu: Oluşturulan XML dosyası sayesinde tüm kesimler Adobe Premiere Pro timeline paneline hazır ve dizili olarak aktarılır.
+
+Görsel Denetim: Zaman çizelgesi üzerinde zum yaparak kesilecek alanları manuel olarak kontrol etme imkanı sunar.
+
+Tamamen Yerel İşleme: Videolarınız hiçbir sunucuya yüklenmez; tüm işlemler kendi bilgisayarınızın gücüyle, güvenli bir şekilde gerçekleştirilir.
+
+Adım Adım Kullanım Rehberi
+Dosya Seçimi: Uygulama üzerinden ham video veya ses dosyanızı sisteme tanıtın.
+
+Hassasiyet Yapılandırması: Sessizlik eşiğini (Threshold) içeriğinizin gürültü seviyesine göre belirleyin (Genellikle -40dB idealdir).
+
+Otomatik Analiz: Analiz butonuna basarak yapay zekanın boşlukları milisaniyelik hassasiyetle bulmasını bekleyin.
+
+XML Çıktısı Alın: Kesim noktaları belirlendikten sonra XML dosyasını bilgisayarınıza kaydedin.
+
+Kurguya Başlayın: Dosyayı Premiere Pro içerisine sürükleyin. Kesilmiş tüm klipleriniz sırasıyla hazır olacaktır.
+
+Gereksinimler ve Kurulum
+Uygulamanın görüntü motoru için bilgisayarınızda VLC Player (64-bit sürümü) yüklü olmalıdır.
+
+Yazılım, Python altyapısı ile çalışmaktadır; launch.py veya derlenmiş .exe dosyası üzerinden erişim sağlanabilir.
+
+ Bu proje, tsitskidev tarafından sunulan açık kaynak kodlu altyapı üzerine inşa edilmiştir. Mevcut sürüm tarafımca tamamen Türkçeleştirilmiş, buton tasarımları ve kullanıcı arayüzü (UI/UX) daha modern ve kullanışlı bir yapıya kavuşturulmuştur.
+ Orijinal proje sahibi: @tsitskidev
+ 
+<img width="1899" height="1000" alt="image" src="https://github.com/user-attachments/assets/5f0bb11e-d157-48d6-bd63-ab1e498077ca" />
+<img width="333" height="206" alt="image (2)" src="https://github.com/user-attachments/assets/ba242ce9-ce4e-4b15-9db2-be584bbb880e" />
+<img width="341" height="142" alt="image (1)" src="https://github.com/user-attachments/assets/7677255c-bfde-47cb-86ef-b563d336d0f1" />
