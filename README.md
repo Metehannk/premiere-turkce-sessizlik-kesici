@@ -40,7 +40,7 @@ Yazılım, Python altyapısı ile çalışmaktadır; launch.py veya derlenmiş .
  Bu proje, tsitskidev tarafından sunulan açık kaynak kodlu altyapı üzerine inşa edilmiştir. Mevcut sürüm tarafımca tamamen Türkçeleştirilmiş, buton tasarımları ve kullanıcı arayüzü (UI/UX) daha modern ve kullanışlı bir
  yapıya kavuşturulmuştur.
  
-Orijinal Proje Sahibi: Tomas Borowiecki (tsitskidev) @tsitskidev
+Orijinal Proje Sahibi: [https://github.com/tsitskidev](https://github.com/tsitskidev)
  
 <img width="1899" height="1000" alt="image" src="https://github.com/user-attachments/assets/5f0bb11e-d157-48d6-bd63-ab1e498077ca" />
 <img width="333" height="206" alt="image (2)" src="https://github.com/user-attachments/assets/ba242ce9-ce4e-4b15-9db2-be584bbb880e" />
