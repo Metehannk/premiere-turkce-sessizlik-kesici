@@ -1,3 +1,4 @@
+
 Premiere Pro Otomatik Türkçe Sessizlik ve Boşluk Kesme Aracı
 AutoCut gibi basit bir uygulama için her ay saçma sapan abonelik ücretleri ödemekten sıkılmadınız mı?
 
@@ -30,3 +31,6 @@ Bu araç Python tabanlıdır ve çalışması için bilgisayarınızda VLC Playe
 
 Teşekkür ve Kredi:
 Bu proje, tsitskidev tarafından geliştirilen harika bir açık kaynak projenin üzerine inşa edilmiştir. Orijinal mantık korunarak tarafımca Türkçeleştirilmiş ve arayüz iyileştirmeleri yapılmıştır.
+<img width="333" height="206" alt="image (2)" src="https://github.com/user-attachments/assets/500bf21d-0cd2-4b9f-850f-1a08f995cf10" />
+<img width="341" height="142" alt="image (1)" src="https://github.com/user-attachments/assets/959414db-03bb-4a9d-b8fc-c6d0429194ff" />
+<img width="1899" height="1000" alt="image" src="https://github.com/user-attachments/assets/9faee067-cd12-46c1-92f4-61ba2d8727cd" />
